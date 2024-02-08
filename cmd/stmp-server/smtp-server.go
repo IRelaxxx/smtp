@@ -26,7 +26,9 @@ func main() {
 			continue
 		}
 
+		server := smtp.CreateServer(smtp.ServerConfig{Hostname: "localhost"})
+
 		// Handle client connection in a goroutine
-		go smtp.HandleRequest(conn)
+		go server.HandleConnection(conn)
 	}
 }
