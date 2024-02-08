@@ -10,6 +10,7 @@ import (
 type server struct {
 	config     ServerConfig
 	clientName string
+	text       *textproto.Conn
 }
 
 type ServerConfig struct {
@@ -21,20 +22,19 @@ func CreateServer(config ServerConfig) server {
 }
 
 func (s *server) HandleConnection(conn net.Conn) {
-	defer conn.Close()
-	text := textproto.NewConn(conn)
-	defer text.Close()
-	s.HandleRequest(text)
-}
+	s.text = textproto.NewConn(conn)
 
-func (s *server) HandleRequest(text *textproto.Conn) {
-	err := text.PrintfLine("220 OK")
+	err := s.text.PrintfLine("220 OK")
 	if err != nil {
-		slog.Error("error sending result", "msg", err)
+		slog.Error("error sending connection result", "msg", err)
 	}
 
+	s.HandleRequest()
+}
+
+func (s *server) HandleRequest() {
 	for {
-		line, err := text.ReadLine()
+		line, err := s.text.ReadLine()
 		if err != nil {
 			slog.Error("error reading line", "msg", err)
 		}
@@ -61,4 +61,19 @@ func (s *server) handleCommand(command string) {
 
 func (s *server) handleEhlo(data string) {
 	s.clientName = data
+
+	err := s.text.PrintfLine("250-%v greets %v", s.config.Hostname, s.clientName)
+	if err != nil {
+		slog.Error("error sending greeting", "err", err)
+	}
+
+	err = s.text.PrintfLine("250-8BITMIME")
+	if err != nil {
+		slog.Error("error sending greeting extension info", "err", err)
+	}
+
+	err = s.text.PrintfLine("250 HELP")
+	if err != nil {
+		slog.Error("error sending greeting end", "err", err)
+	}
 }
